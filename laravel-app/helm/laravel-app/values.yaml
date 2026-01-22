@@ -1,0 +1,45 @@
+# Default values for laravel-app
+# This is a YAML-formatted file.
+
+# Application settings
+app:
+  name: laravel-app
+  image:
+    app: laravel-app-app:latest
+    nginx: laravel-app-nginx:latest
+  replicas: 1
+
+# Laravel configuration
+laravel:
+  appName: "Laravel"
+  appEnv: "production"
+  appDebug: "false"
+  appUrl: "http://laravel-app.local"
+  appKey: "base64:BTfPQTW53cN12TSA9kwq4u9pRRIoevOqrkPtFWndXDU="
+
+# Database configuration
+mysql:
+  enabled: true
+  image: mysql:8.0
+  database: laravel
+  username: laravel_user
+  password: laravel_password
+  rootPassword: root_password
+
+# Redis configuration
+redis:
+  enabled: true
+  image: redis:alpine
+  password: ""
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# Ingress configuration
+ingress:
+  enabled: true
+  host: laravel-app.local
+  annotations: {}
+

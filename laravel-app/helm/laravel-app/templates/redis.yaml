@@ -1,0 +1,43 @@
+{{- if .Values.redis.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "laravel-app.fullname" . }}-redis
+  labels:
+    {{- include "laravel-app.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ include "laravel-app.fullname" . }}-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "laravel-app.fullname" . }}-redis
+  labels:
+    {{- include "laravel-app.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "laravel-app.fullname" . }}-redis
+  template:
+    metadata:
+      labels:
+        app: {{ include "laravel-app.fullname" . }}-redis
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image }}
+          {{- if .Values.redis.password }}
+          env:
+            - name: REDIS_PASSWORD
+              value: {{ .Values.redis.password | quote }}
+          {{- end }}
+          ports:
+            - containerPort: 6379
+{{- end }}
+

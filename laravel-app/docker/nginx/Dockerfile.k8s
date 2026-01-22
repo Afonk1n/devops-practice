@@ -1,0 +1,10 @@
+FROM nginx:alpine
+
+WORKDIR /etc/nginx
+
+# Копируем код Laravel (нужен для статики и правильных путей)
+COPY src /var/www/html
+
+# Копируем конфиг (будет перезаписан ConfigMap в k8s, но на всякий случай)
+COPY docker/nginx/nginx.conf /etc/nginx/conf.d/default.conf
+

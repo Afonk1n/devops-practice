@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "laravel-app.fullname" . }}-config
+  labels:
+    {{- include "laravel-app.labels" . | nindent 4 }}
+data:
+  APP_NAME: {{ .Values.laravel.appName | quote }}
+  APP_ENV: {{ .Values.laravel.appEnv | quote }}
+  APP_DEBUG: {{ .Values.laravel.appDebug | quote }}
+  APP_URL: {{ .Values.laravel.appUrl | quote }}
+  APP_KEY: {{ .Values.laravel.appKey | quote }}
+

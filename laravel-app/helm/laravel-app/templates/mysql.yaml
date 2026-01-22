@@ -1,0 +1,47 @@
+{{- if .Values.mysql.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "laravel-app.fullname" . }}-mysql
+  labels:
+    {{- include "laravel-app.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ include "laravel-app.fullname" . }}-mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "laravel-app.fullname" . }}-mysql
+  labels:
+    {{- include "laravel-app.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "laravel-app.fullname" . }}-mysql
+  template:
+    metadata:
+      labels:
+        app: {{ include "laravel-app.fullname" . }}-mysql
+    spec:
+      containers:
+        - name: mysql
+          image: {{ .Values.mysql.image }}
+          env:
+            - name: MYSQL_DATABASE
+              value: {{ .Values.mysql.database | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.mysql.username | quote }}
+            - name: MYSQL_PASSWORD
+              value: {{ .Values.mysql.password | quote }}
+            - name: MYSQL_ROOT_PASSWORD
+              value: {{ .Values.mysql.rootPassword | quote }}
+          ports:
+            - containerPort: 3306
+{{- end }}
+

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laravel-web
+  labels:
+    app: laravel-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: laravel-web
+  template:
+    metadata:
+      labels:
+        app: laravel-web
+    spec:
+      containers:
+        - name: app
+          image: laravel-app-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9000
+          envFrom:
+            - configMapRef:
+                name: laravel-app-config
+            - secretRef:
+                name: laravel-app-secret
+          env:
+            - name: DB_HOST
+              value: mysql
+            - name: DB_PORT
+              value: "3306"
+            - name: REDIS_HOST
+              value: redis
+            - name: APP_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: laravel-app-config
+                  key: APP_KEY
+        - name: nginx
+          image: laravel-app-nginx:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: laravel-nginx-config
+
+
