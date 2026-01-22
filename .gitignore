@@ -1,0 +1,26 @@
+# Laravel
+laravel-app/src/.env
+laravel-app/src/.env.*
+laravel-app/src/vendor/
+laravel-app/src/storage/logs/*.log
+laravel-app/src/storage/framework/cache/*
+laravel-app/src/storage/framework/sessions/*
+laravel-app/src/storage/framework/views/*
+laravel-app/src/bootstrap/cache/*.php
+laravel-app/src/node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+
