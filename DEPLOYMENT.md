@@ -1,50 +1,99 @@
-# Инструкция по развёртыванию Laravel-приложения в Kubernetes
+# Пошаговая инструкция по развёртыванию Laravel-приложения
 
-Эта инструкция поможет развернуть Laravel-приложение в Kubernetes-кластере (Docker Desktop) с использованием Helm.
-
-## Предварительные требования
-
-1. **Docker Desktop** установлен и запущен
-2. **Kubernetes** включён в Docker Desktop (Settings → Kubernetes → Enable Kubernetes)
-3. **Helm 3.x** установлен (проверка: `helm version`)
-4. **WSL2 + Ubuntu** (для Windows) или Linux-терминал
-
-### Проверка окружения
-
-```bash
-# Проверить Docker
-docker --version
-
-# Проверить Kubernetes
-kubectl version --client
-kubectl get nodes
-
-# Проверить Helm
-helm version
-```
-
-Если что-то не работает — установи недостающие компоненты.
+Полная инструкция от установки WSL до запуска мониторинга.
 
 ---
 
-## Шаг 1: Сборка Docker-образов
+## Шаг 0: Установка WSL2 + Ubuntu (только для Windows)
 
-Перейди в папку проекта и собери образы для PHP-FPM и Nginx:
+**Если у тебя уже есть WSL2 и Ubuntu — пропусти этот шаг.**
+
+1. **Установить WSL2:**
+   ```powershell
+   # В PowerShell от администратора
+   wsl --install
+   ```
+   Перезагрузи компьютер.
+
+2. **Установить Ubuntu:**
+   - После перезагрузки открой Ubuntu из меню Пуск
+   - Создай пользователя (имя и пароль)
+
+3. **Проверка:**
+   ```bash
+   # В Ubuntu
+   wsl --version
+   ```
+
+---
+
+## Шаг 1: Установка Docker Desktop
+
+1. **Скачать Docker Desktop:**
+   - https://www.docker.com/products/docker-desktop/
+   - Установи и запусти
+
+2. **Включить Kubernetes:**
+   - Docker Desktop → Settings → Kubernetes
+   - Поставь галочку "Enable Kubernetes"
+   - Нажми "Apply & Restart"
+
+3. **Проверка:**
+   ```bash
+   # В WSL (Ubuntu)
+   docker --version
+   kubectl version --client
+   kubectl get nodes
+   ```
+   Должен быть один узел в статусе `Ready`.
+
+---
+
+## Шаг 2: Установка Helm
 
 ```bash
-cd /mnt/d/DevOpsPractice/laravel-app
+# В WSL (Ubuntu)
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
 
-# Собрать образ PHP-FPM (с кодом Laravel)
+**Проверка:**
+```bash
+helm version
+```
+
+Должна быть версия Helm 3.x.
+
+---
+
+## Шаг 3: Клонирование репозитория
+
+```bash
+# В WSL (Ubuntu)
+cd ~
+git clone https://github.com/Afonk1n/devops-practice.git
+cd devops-practice/laravel-app
+```
+
+**Проверка:**
+```bash
+ls -la
+# Должны быть папки: docker/, helm/, k8s/, src/
+```
+
+---
+
+## Шаг 4: Сборка Docker-образов
+
+```bash
+# В WSL, в папке laravel-app
+cd ~/devops-practice/laravel-app
+
+# Собрать образ PHP-FPM
 sudo docker build -f docker/php-fpm/Dockerfile.k8s -t laravel-app-app:latest .
 
 # Собрать образ Nginx
 sudo docker build -f docker/nginx/Dockerfile.k8s -t laravel-app-nginx:latest .
 ```
-
-**Что происходит:**
-- `Dockerfile.k8s` копирует код Laravel в образ и устанавливает зависимости через `composer install`
-- Образы получают теги `laravel-app-app:latest` и `laravel-app-nginx:latest`
-- Эти имена должны совпадать с `values.yaml` в Helm-чарте
 
 **Проверка:**
 ```bash
@@ -53,199 +102,240 @@ docker images | grep laravel-app
 
 Должны быть два образа: `laravel-app-app` и `laravel-app-nginx`.
 
+**Время:** ~2-5 минут (зависит от скорости интернета).
+
 ---
 
-## Шаг 2: Установка через Helm
-
-Установи приложение в Kubernetes через Helm-чарт:
+## Шаг 5: Установка приложения через Helm
 
 ```bash
-cd /mnt/d/DevOpsPractice/laravel-app/helm/laravel-app
-
-# Проверить шаблоны (опционально, для отладки)
-helm template laravel-app . --debug
+# Перейти в папку Helm-чарта
+cd ~/devops-practice/laravel-app/helm/laravel-app
 
 # Установить приложение
 helm install laravel-app .
 ```
 
-**Что происходит:**
-- Helm читает `Chart.yaml` и `values.yaml`
-- Генерирует Kubernetes-манифесты из шаблонов в `templates/`
-- Применяет их в кластер (создаёт Deployment, Service, ConfigMap, Secret и т.д.)
-
-**Проверка установки:**
+**Проверка:**
 ```bash
-# Проверить статус Helm-релиза
+# Статус установки
 helm status laravel-app
 
-# Проверить поды
+# Проверить поды (подожди 30-60 секунд, пока запустятся)
 kubectl get pods
 
-# Должны быть поды:
-# - laravel-app-web-xxx (2/2 Running) - Laravel приложение
-# - laravel-app-mysql-xxx (1/1 Running) - MySQL
-# - laravel-app-redis-xxx (1/1 Running) - Redis
+# Должны быть:
+# - laravel-app-web-xxx (2/2 Running)
+# - laravel-app-mysql-xxx (1/1 Running)
+# - laravel-app-redis-xxx (1/1 Running)
 ```
 
 **Если поды не запускаются:**
 ```bash
-# Посмотреть события
-kubectl get events --sort-by='.lastTimestamp'
-
-# Посмотреть логи пода
-kubectl logs <pod-name> -c app  # для контейнера app
-kubectl logs <pod-name> -c nginx  # для контейнера nginx
-
-# Описание пода (для диагностики)
+# Посмотреть логи
+kubectl logs <pod-name> -c app
 kubectl describe pod <pod-name>
 ```
 
 ---
 
-## Шаг 3: Выполнение миграций базы данных
-
-После того как поды запустились, нужно выполнить миграции Laravel:
+## Шаг 6: Выполнение миграций базы данных
 
 ```bash
 # Найти имя пода Laravel
-kubectl get pods -l app.kubernetes.io/name=laravel-app
-
-# Выполнить миграции (замени <pod-name> на реальное имя)
-kubectl exec -it <pod-name> -c app -- php artisan migrate --force
-```
-
-**Или автоматически найти под:**
-```bash
 POD_NAME=$(kubectl get pods -l app.kubernetes.io/name=laravel-app -o jsonpath='{.items[0].metadata.name}')
+
+# Выполнить миграции
 kubectl exec -it $POD_NAME -c app -- php artisan migrate --force
 ```
 
-**Что происходит:**
-- `php artisan migrate --force` создаёт таблицы в базе данных MySQL
-- Флаг `--force` нужен, потому что мы в production-окружении
-
 **Проверка:**
 ```bash
-# Проверить, что миграции выполнены
+# Проверить статус миграций
 kubectl exec -it $POD_NAME -c app -- php artisan migrate:status
 ```
 
+Должны быть выполнены все миграции.
+
 ---
 
-## Шаг 4: Проверка работы приложения
-
-### Вариант 1: Через port-forward (для локального доступа)
+## Шаг 7: Проверка работы приложения
 
 ```bash
-# Пробросить порт Service в локальную машину
+# Пробросить порт в локальную машину
 kubectl port-forward service/laravel-app-web 8080:80
 ```
 
-Затем открой в браузере: `http://localhost:8080`
+**Открой в браузере:** `http://localhost:8080`
 
 **Должна открыться стартовая страница Laravel.**
 
-### Вариант 2: Через Ingress (если настроен Ingress Controller)
-
-Если у тебя установлен Ingress Controller (например, Nginx Ingress), приложение будет доступно по адресу из `ingress.yaml` (по умолчанию `laravel-app.local`).
-
-Добавь в `/etc/hosts` (Linux/Mac) или `C:\Windows\System32\drivers\etc\hosts` (Windows):
-```
-127.0.0.1 laravel-app.local
-```
-
-Затем открой в браузере: `http://laravel-app.local`
+**Чтобы остановить port-forward:** нажми `Ctrl+C` в терминале.
 
 ---
 
-## Шаг 5: Полезные команды для управления
+## Шаг 8: Установка мониторинга (Prometheus + Grafana)
 
-### Обновление приложения
+### 8.1. Добавить репозиторий Helm
 
 ```bash
-# Обновить с новыми значениями
-helm upgrade laravel-app . --set app.replicas=2
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+```
 
-# Обновить с кастомным файлом values
-helm upgrade laravel-app . -f my-values.yaml
+**Проверка:**
+```bash
+helm repo list
+```
+
+Должен быть репозиторий `prometheus-community`.
+
+### 8.2. Установить kube-prometheus-stack
+
+```bash
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring --create-namespace
+```
+
+**Проверка:**
+```bash
+# Подожди 1-2 минуты, пока запустятся поды
+kubectl get pods -n monitoring
+
+# Должны быть поды:
+# - prometheus-grafana-xxx (3/3 Running)
+# - prometheus-kube-prometheus-operator-xxx (1/1 Running)
+# - prometheus-kube-state-metrics-xxx (1/1 Running)
+# - prometheus-prometheus-kube-prometheus-prometheus-0 (2/2 Running)
+# - alertmanager-prometheus-kube-prometheus-alertmanager-0 (2/2 Running)
+```
+
+**Время:** ~2-3 минуты на запуск всех подов.
+
+### 8.3. Получить пароль Grafana
+
+```bash
+kubectl get secret prometheus-grafana -n monitoring \
+  -o jsonpath="{.data.admin-password}" | base64 -d
+```
+
+**Скопируй пароль** (он понадобится для входа).
+
+### 8.4. Доступ к Grafana
+
+```bash
+# Пробросить порт Grafana
+kubectl port-forward -n monitoring service/prometheus-grafana 3000:80
+```
+
+**Открой в браузере:** `http://localhost:3000`
+
+**Логин:** `admin`  
+**Пароль:** (тот, что скопировал в шаге 8.3)
+
+### 8.5. Просмотр дашбордов в Grafana
+
+После входа в Grafana:
+
+1. **Найди готовые дашборды:**
+   - Слева меню → Dashboards → Browse
+   - Или в поиске: "Kubernetes", "Node", "Pod"
+
+2. **Популярные дашборды:**
+   - "Kubernetes / Compute Resources / Pod"
+   - "Node Exporter / Nodes"
+   - "Kubernetes / Kubelet"
+
+3. **Посмотреть метрики Laravel-приложения:**
+   - Выбери дашборд "Kubernetes / Compute Resources / Pod"
+   - В фильтре выбери namespace: `default`
+   - Выбери под: `laravel-app-web-xxx`
+   - Увидишь CPU, память, сеть для твоего приложения
+
+**Чтобы остановить port-forward:** нажми `Ctrl+C` в терминале.
+
+---
+
+## Шаг 9: Итоговая проверка
+
+```bash
+# Проверить все поды
+kubectl get pods
+
+# Проверить сервисы
+kubectl get svc
+
+# Проверить Helm-релизы
+helm list
+
+# Проверить мониторинг
+kubectl get pods -n monitoring
+```
+
+**Должно быть:**
+- ✅ Все поды в статусе `Running`
+- ✅ Сервисы в статусе `ClusterIP`
+- ✅ Helm-релизы: `laravel-app` и `prometheus`
+- ✅ Мониторинг работает (поды в namespace `monitoring`)
+
+---
+
+## Полезные команды
+
+### Просмотр логов
+
+```bash
+# Логи Laravel-приложения
+POD_NAME=$(kubectl get pods -l app.kubernetes.io/name=laravel-app -o jsonpath='{.items[0].metadata.name}')
+kubectl logs $POD_NAME -c app
+kubectl logs $POD_NAME -c nginx
+
+# Логи с отслеживанием (как tail -f)
+kubectl logs -f $POD_NAME -c app
 ```
 
 ### Масштабирование
 
 ```bash
 # Увеличить количество реплик до 2
+cd ~/devops-practice/laravel-app/helm/laravel-app
 helm upgrade laravel-app . --set app.replicas=2
 
-# Проверить поды (должно быть 2 пода)
+# Проверить
 kubectl get pods -l app.kubernetes.io/name=laravel-app
-```
-
-### Просмотр логов
-
-```bash
-# Логи контейнера app (PHP-FPM)
-kubectl logs <pod-name> -c app
-
-# Логи контейнера nginx
-kubectl logs <pod-name> -c nginx
-
-# Логи с отслеживанием (как tail -f)
-kubectl logs -f <pod-name> -c app
 ```
 
 ### Выполнение команд в контейнере
 
 ```bash
-# Запустить tinker (интерактивная консоль Laravel)
-kubectl exec -it <pod-name> -c app -- php artisan tinker
-
-# Очистить кеш
-kubectl exec -it <pod-name> -c app -- php artisan cache:clear
-kubectl exec -it <pod-name> -c app -- php artisan config:clear
+# Очистить кеш Laravel
+kubectl exec -it $POD_NAME -c app -- php artisan cache:clear
 
 # Проверить переменные окружения
-kubectl exec -it <pod-name> -c app -- env | grep APP_
+kubectl exec -it $POD_NAME -c app -- env | grep APP_
 ```
 
-### Проверка состояния
+### Удаление приложения
 
 ```bash
-# Статус Helm-релиза
-helm status laravel-app
-
-# Все ресурсы
-kubectl get all
-
-# Сервисы
-kubectl get svc
-
-# ConfigMap и Secret
-kubectl get configmap
-kubectl get secret
-
-# NetworkPolicy
-kubectl get networkpolicy
-```
-
----
-
-## Шаг 6: Удаление приложения
-
-Если нужно удалить всё приложение:
-
-```bash
-# Удалить Helm-релиз (удалит все ресурсы)
+# Удалить Laravel-приложение
 helm uninstall laravel-app
 
-# Проверить, что всё удалено
-kubectl get pods
-kubectl get svc
+# Удалить мониторинг
+helm uninstall prometheus -n monitoring
 ```
 
 ---
 
-## Возможные проблемы и решения
+## Возможные проблемы
+
+### Проблема: "permission denied" при docker build
+
+**Решение:**
+```bash
+# Использовать sudo
+sudo docker build -f docker/php-fpm/Dockerfile.k8s -t laravel-app-app:latest .
+```
 
 ### Проблема: Поды не запускаются (CrashLoopBackOff)
 
@@ -253,131 +343,65 @@ kubectl get svc
 ```bash
 # Посмотреть логи
 kubectl logs <pod-name> -c app
-
-# Посмотреть события
 kubectl describe pod <pod-name>
 
 # Частые причины:
-# - Не собран Docker-образ (выполни Шаг 1)
-# - Неправильные переменные окружения (проверь ConfigMap/Secret)
-# - Проблемы с подключением к базе (проверь, что MySQL под запущен)
+# - Не собран Docker-образ (выполни Шаг 4)
+# - MySQL не запустился (подожди ещё минуту)
 ```
 
-### Проблема: "No application encryption key has been specified"
+### Проблема: "No application encryption key"
 
 **Решение:**
 ```bash
-# Проверить, что APP_KEY есть в ConfigMap
+# Проверить ConfigMap
 kubectl get configmap laravel-app-config -o yaml | grep APP_KEY
 
-# Если нет — добавить в values.yaml и обновить
+# Если пусто — обновить через Helm
+cd ~/devops-practice/laravel-app/helm/laravel-app
 helm upgrade laravel-app . --set laravel.appKey="base64:ТВОЙ_КЛЮЧ"
 ```
 
-### Проблема: "Connection refused" к MySQL
+### Проблема: Grafana показывает "No data"
 
 **Решение:**
-```bash
-# Проверить, что MySQL под запущен
-kubectl get pods | grep mysql
-
-# Проверить Service
-kubectl get svc | grep mysql
-
-# Проверить переменные окружения в Laravel-поде
-kubectl exec -it <pod-name> -c app -- env | grep DB_
-```
-
-### Проблема: Health checks не проходят
-
-**Решение:**
-```bash
-# Проверить probes в Deployment
-kubectl describe pod <pod-name> | grep -A 5 "Liveness\|Readiness"
-
-# Если используется tcpSocket на порту 9000, убедись, что PHP-FPM слушает этот порт
-kubectl exec -it <pod-name> -c app -- netstat -tlnp | grep 9000
-```
-
----
-
-## Структура проекта
-
-```
-laravel-app/
-├── docker/                    # Dockerfile'ы
-│   ├── php-fpm/
-│   │   ├── Dockerfile         # Для docker-compose
-│   │   └── Dockerfile.k8s     # Для Kubernetes (с кодом)
-│   └── nginx/
-│       ├── Dockerfile         # Для docker-compose
-│       ├── Dockerfile.k8s     # Для Kubernetes (с кодом)
-│       └── nginx.conf         # Конфигурация Nginx
-├── helm/laravel-app/          # Helm-чарт
-│   ├── Chart.yaml            # Метаданные чарта
-│   ├── values.yaml            # Настройки по умолчанию
-│   └── templates/             # Шаблоны Kubernetes-манифестов
-├── k8s/                       # Исходные манифесты (для наглядности)
-├── src/                       # Код Laravel-приложения
-└── docker-compose.yml         # Для локальной разработки
-```
-
----
-
-## Дополнительно
-
-### Локальная разработка (docker-compose)
-
-Для локальной разработки можно использовать docker-compose:
-
-```bash
-cd /mnt/d/DevOpsPractice/laravel-app
-docker compose up --build
-```
-
-Приложение будет доступно на `http://localhost:8082`
-
-### Мониторинг (Prometheus + Grafana)
-
-Если нужно установить мониторинг:
-
-```bash
-# Добавить репозиторий
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-
-# Установить
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  --namespace monitoring --create-namespace
-
-# Получить пароль Grafana
-kubectl get secret prometheus-grafana -n monitoring \
-  -o jsonpath="{.data.admin-password}" | base64 -d
-
-# Доступ к Grafana
-kubectl port-forward -n monitoring service/prometheus-grafana 3000:80
-```
-
-Открой `http://localhost:3000`, логин: `admin`, пароль: (из команды выше)
+- Это нормально для Docker Desktop (ограниченные метрики)
+- Попробуй другие дашборды или подожди 5-10 минут
+- В реальном кластере метрики будут работать лучше
 
 ---
 
 ## Итог
 
 После выполнения всех шагов у тебя будет:
-- ✅ Laravel-приложение работает в Kubernetes
-- ✅ MySQL и Redis развёрнуты как отдельные сервисы
-- ✅ Приложение доступно через port-forward или Ingress
-- ✅ Health checks настроены
-- ✅ NetworkPolicy ограничивает сетевой трафик
-- ✅ Всё управляется через Helm
 
-**Проверка финального состояния:**
-```bash
-helm status laravel-app
-kubectl get pods
-kubectl get svc
+- ✅ WSL2 + Ubuntu установлены
+- ✅ Docker Desktop с Kubernetes работает
+- ✅ Helm установлен
+- ✅ Laravel-приложение работает в Kubernetes
+- ✅ MySQL и Redis развёрнуты
+- ✅ Приложение доступно на `http://localhost:8080`
+- ✅ Мониторинг установлен (Prometheus + Grafana)
+- ✅ Grafana доступна на `http://localhost:3000`
+
+**Время выполнения:** ~30-40 минут (включая установку и ожидание запуска подов).
+
+---
+
+## Структура проекта
+
+```
+devops-practice/
+├── DEPLOYMENT.md              # Эта инструкция
+├── final_overview_laravel.md  # Подробная документация
+├── interview_script_laravel.md # Речевые формулировки
+└── laravel-app/
+    ├── docker/                # Dockerfile'ы
+    ├── helm/laravel-app/      # Helm-чарт
+    ├── k8s/                   # Манифесты (для наглядности)
+    └── src/                   # Код Laravel
 ```
 
-Все поды должны быть в статусе `Running`, сервисы — `ClusterIP`.
+---
 
+**Готово!** Проект полностью развёрнут и готов к работе.
